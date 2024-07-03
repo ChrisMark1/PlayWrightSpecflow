@@ -1,39 +1,37 @@
-name: .NET
+stages:
+  - build
+  - test
 
-on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+variables:
+  PLAYWRIGHT_BROWSERS_PATH: "/usr/local/playwright-browsers"
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" # Skip the automatic browser download
 
-jobs:
-  build:
+before_script:
+  - apt-get update -qq && apt-get install -y -qq curl unzip wget
+  - wget https://github.com/microsoft/playwright-cli/releases/download/v1.13.0/playwright-cli-linux -O /usr/local/bin/playwright
+  - chmod +x /usr/local/bin/playwright
+  - npm install -D @playwright/test
+  - npx playwright install --browsers-path $PLAYWRIGHT_BROWSERS_PATH
 
-    runs-on: ubuntu-latest
+cache:
+  paths:
+    - .nuget/packages/
+    - node_modules/
+    - $PLAYWRIGHT_BROWSERS_PATH
 
-    steps:
-      - uses: actions/checkout@v4
+build_job:
+  stage: build
+  script:
+    - dotnet restore
+    - dotnet build --configuration Release
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Install Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16.x'
-
-      - name: Install Playwright
-        run: |
-          npm install -D @playwright/test
-          npx playwright install
-
-      - name: Build
-        run: dotnet build --no-restore
-
-      - name: Test
-        run: dotnet test --no-build --verbosity normal
+test_job:
+  stage: test
+  script:
+    - dotnet test --configuration Release --no-build --logger "trx;LogFileName=TestResults.trx"
+  artifacts:
+    when: always
+    paths:
+      - TestResults.trx
+    reports:
+      junit: TestResults.trx
