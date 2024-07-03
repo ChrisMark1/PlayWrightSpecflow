@@ -1,0 +1,33 @@
+﻿stages:
+  - build
+  - test
+
+variables:
+  # Define any necessary variables here, such as environment variables or paths
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" # If you want to skip browser download in CI to speed up builds
+
+before_script:
+  - apt-get update -qq && apt-get install -y -qq unzip wget
+  - wget https://github.com/microsoft/playwright-cli/releases/download/v1.13.0/playwright-cli-linux -O /usr/local/bin/playwright
+  - chmod +x /usr/local/bin/playwright
+
+cache:
+  paths:
+    - .nuget/packages/
+
+build_job:
+  stage: build
+  script:
+    - dotnet restore
+    - dotnet build --configuration Release
+
+test_job:
+  stage: test
+  script:
+    - dotnet test --configuration Release --no-build --logger "trx;LogFileName=TestResults.trx"
+  artifacts:
+    when: always
+    paths:
+      - TestResults.trx
+    reports:
+      junit: TestResults.trx
